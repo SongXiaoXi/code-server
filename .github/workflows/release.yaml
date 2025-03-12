@@ -202,9 +202,6 @@ jobs:
     runs-on: macos-13
     timeout-minutes: 15
     needs: npm-version
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -213,12 +210,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
-          cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            test/package-lock.json
-
-      - run: SKIP_SUBMODULE_DEPS=1 npm ci
 
       - name: Install nfpm
         run: |
@@ -230,18 +221,28 @@ jobs:
       # in Python 3.12.  It seems to be fixed in the latest node-gyp so when we
       # next update Node we can probably remove this.  For now, install
       # setuptools since it contains distutils.
-      - run: brew install python-setuptools
+      - name: Install Python utilities
+        run: brew install python-setuptools
 
       - name: Download npm package
         uses: actions/download-artifact@v4
         with:
           name: npm-release-package
 
-      - run: tar -xzf package.tar.gz
-      - run: npm run release:standalone
-      - run: npm run test:native
+      - name: Decompress npm package
+        run: tar -xzf package.tar.gz
 
-      # Strip out the v (v4.9.1 -> 4.9.1).
+      - name: Build standalone release
+        run: npm run release:standalone
+
+      - name: Install test dependencies
+        run: SKIP_SUBMODULE_DEPS=1 yarn install
+
+      - name: Run native module tests on standalone release
+        run: yarn test:native
+
+      # NOTE@jsjoeio - we do this so we can strip out the v
+      # i.e. v4.9.1 -> 4.9.1
       - name: Get and set VERSION
         run: |
           TAG="${{ inputs.version || github.ref_name }}"
@@ -250,9 +251,9 @@ jobs:
       - name: Build packages with nfpm
         env:
           VERSION: ${{ env.VERSION }}
-        run: npm run package
+        run: yarn package
 
-      - uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v2
         with:
           draft: true
           discussion_category_name: "📣 Announcements"
@@ -384,4 +385,3 @@ jobs:
         with:
           name: npm-release-package
           path: ./package.tar.gz
-
