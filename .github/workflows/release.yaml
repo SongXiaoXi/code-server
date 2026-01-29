@@ -166,6 +166,36 @@ jobs:
 
       - run: tar -xzf package.tar.gz
       - run: npm run release:standalone
+      - name: Patch node-pty posix_spawn logging
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("release-standalone/lib/vscode/node_modules/node-pty/src/unix/pty.cc")
+          text = path.read_text()
+
+          if "posix_spawnp failed:" not in text:
+            if "#include <stdio.h>" not in text:
+              text = text.replace("#include <string.h>\n", "#include <string.h>\n#include <stdio.h>\n")
+            text = text.replace(
+              'throw Napi::Error::New(napiEnv, "posix_spawnp failed.");',
+              'std::string msg = "posix_spawnp failed: " + std::to_string(err) + " (" + strerror(err) + ")";\n    throw Napi::Error::New(napiEnv, msg);',
+            )
+            text = text.replace(
+              "*err = posix_spawnattr_setflags(&attrs, flags);\n  if (*err != 0) {\n    goto done;\n  }",
+              "*err = posix_spawnattr_setflags(&attrs, flags);\n  if (*err != 0) {\n    fprintf(stderr, \"node-pty: posix_spawnattr_setflags failed: %d (%s)\\n\", *err, strerror(*err));\n    goto done;\n  }",
+            )
+            text = text.replace(
+              "do\n    *err = posix_spawn(pid, argv[0], &acts, &attrs, argv, env);\n  while (*err == EINTR);\n",
+              "do\n    *err = posix_spawn(pid, argv[0], &acts, &attrs, argv, env);\n  while (*err == EINTR);\n  if (*err != 0) {\n    fprintf(stderr, \"node-pty: posix_spawn failed: %d (%s)\\n\", *err, strerror(*err));\n  }\n",
+            )
+            if "posix_spawnp failed:" not in text:
+              raise SystemExit("node-pty patch failed: expected marker not found after edit")
+            path.write_text(text)
+          PY
+          cd release-standalone/lib/vscode
+          npm rebuild node-pty --build-from-source
+          strings node_modules/node-pty/build/Release/pty.node | grep -q "posix_spawnp failed:" || (echo "node-pty binary missing debug string" && exit 1)
       - run: npm run test:native
 
       # Strip out the v (v4.9.1 -> 4.9.1).
@@ -227,6 +257,36 @@ jobs:
 
       - run: tar -xzf package.tar.gz
       - run: npm run release:standalone
+      - name: Patch node-pty posix_spawn logging
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("release-standalone/lib/vscode/node_modules/node-pty/src/unix/pty.cc")
+          text = path.read_text()
+
+          if "posix_spawnp failed:" not in text:
+            if "#include <stdio.h>" not in text:
+              text = text.replace("#include <string.h>\n", "#include <string.h>\n#include <stdio.h>\n")
+            text = text.replace(
+              'throw Napi::Error::New(napiEnv, "posix_spawnp failed.");',
+              'std::string msg = "posix_spawnp failed: " + std::to_string(err) + " (" + strerror(err) + ")";\n    throw Napi::Error::New(napiEnv, msg);',
+            )
+            text = text.replace(
+              "*err = posix_spawnattr_setflags(&attrs, flags);\n  if (*err != 0) {\n    goto done;\n  }",
+              "*err = posix_spawnattr_setflags(&attrs, flags);\n  if (*err != 0) {\n    fprintf(stderr, \"node-pty: posix_spawnattr_setflags failed: %d (%s)\\n\", *err, strerror(*err));\n    goto done;\n  }",
+            )
+            text = text.replace(
+              "do\n    *err = posix_spawn(pid, argv[0], &acts, &attrs, argv, env);\n  while (*err == EINTR);\n",
+              "do\n    *err = posix_spawn(pid, argv[0], &acts, &attrs, argv, env);\n  while (*err == EINTR);\n  if (*err != 0) {\n    fprintf(stderr, \"node-pty: posix_spawn failed: %d (%s)\\n\", *err, strerror(*err));\n  }\n",
+            )
+            if "posix_spawnp failed:" not in text:
+              raise SystemExit("node-pty patch failed: expected marker not found after edit")
+            path.write_text(text)
+          PY
+          cd release-standalone/lib/vscode
+          npm rebuild node-pty --build-from-source
+          strings node_modules/node-pty/build/Release/pty.node | grep -q "posix_spawnp failed:" || (echo "node-pty binary missing debug string" && exit 1)
       - run: npm run test:native
 
       # Strip out the v (v4.9.1 -> 4.9.1).
