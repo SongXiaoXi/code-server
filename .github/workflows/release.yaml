@@ -166,7 +166,20 @@ jobs:
 
       - run: tar -xzf package.tar.gz
       - run: npm run release:standalone
+      - name: Log node-pty prebuilt binary info
+        run: |
+          set -x
+          cd release-standalone/lib/vscode
+          node -p "process.version"
+          node -p "process.platform + ' ' + process.arch"
+          node -p "process.versions"
+          node -e "console.log('node-pty:', require.resolve('node-pty'))"
+          file node_modules/node-pty/build/Release/pty.node || true
+          otool -L node_modules/node-pty/build/Release/pty.node || true
+          otool -l node_modules/node-pty/build/Release/pty.node | grep -E "LC_BUILD_VERSION|LC_VERSION_MIN_MACOSX|minos|sdk" || true
+          codesign -dv --verbose=4 node_modules/node-pty/build/Release/pty.node 2>&1 | head -n 50 || true
       - name: Patch node-pty posix_spawn logging
+        if: env.NODE_PTY_DEBUG_PATCH == '1'
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -257,7 +270,20 @@ jobs:
 
       - run: tar -xzf package.tar.gz
       - run: npm run release:standalone
+      - name: Log node-pty prebuilt binary info
+        run: |
+          set -x
+          cd release-standalone/lib/vscode
+          node -p "process.version"
+          node -p "process.platform + ' ' + process.arch"
+          node -p "process.versions"
+          node -e "console.log('node-pty:', require.resolve('node-pty'))"
+          file node_modules/node-pty/build/Release/pty.node || true
+          otool -L node_modules/node-pty/build/Release/pty.node || true
+          otool -l node_modules/node-pty/build/Release/pty.node | grep -E "LC_BUILD_VERSION|LC_VERSION_MIN_MACOSX|minos|sdk" || true
+          codesign -dv --verbose=4 node_modules/node-pty/build/Release/pty.node 2>&1 | head -n 50 || true
       - name: Patch node-pty posix_spawn logging
+        if: env.NODE_PTY_DEBUG_PATCH == '1'
         run: |
           python3 - <<'PY'
           from pathlib import Path
